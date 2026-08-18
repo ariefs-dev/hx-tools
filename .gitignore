@@ -1,0 +1,47 @@
+# --- Third-party material that must NOT be redistributed -------------------
+# Line 6 / Yamaha Guitar Group own the manuals and their PDF sources, and the
+# tone guide is a third-party work. They are reference material for working in
+# this repo, not ours to publish.
+/pdf/
+/*.md
+!/README.md
+!/CLAUDE.md
+
+# Community projects cloned in for reference only. Each carries its own
+# licence (phelix is GPL-3) and its own git history; clone them yourself —
+# see the README.
+/src/vendor/
+
+# Model catalog + artwork imported from a local HX Edit installation.
+# Proprietary Line 6 data: it stays on the machine that imported it.
+/src/hxviewer/public/hx-res/
+
+# --- Build output ----------------------------------------------------------
+node_modules/
+.next/
+out/
+build/
+dist/
+*.tsbuildinfo
+next-env.d.ts
+
+# Python
+__pycache__/
+*.py[cod]
+.venv/
+venv/
+*.egg-info/
+.pytest_cache/
+
+# --- Local noise -----------------------------------------------------------
+.DS_Store
+Thumbs.db
+.env*
+.vercel
+*.log
+
+# Presets are personal; don't commit them by accident. The one exception is
+# hx-cli's hand-written test fixture, which is ours and the suite needs it.
+*.hlx
+*.hxb
+!/src/hxcli/tests/fixtures/*.hlx
