@@ -20,12 +20,17 @@ import {
   type LoadedPreset,
 } from "@/lib/hlx/editor";
 import {
+  addAmpCab,
   addBlock,
   addableModels,
+  ampModels,
+  cabModels,
+  canAddAmp,
   canAddBlock,
   canMoveBlock,
   moveBlock,
   removeBlock,
+  setAmpCab,
   swapCandidates,
   swapModel,
   type MoveDirection,
@@ -75,6 +80,8 @@ export function PresetViewer() {
     [preset, revision]
   );
   const addable = useMemo(() => addableModels(catalog), [catalog]);
+  const amps = useMemo(() => ampModels(catalog), [catalog]);
+  const cabs = useMemo(() => cabModels(catalog), [catalog]);
   const dirty = useMemo(
     () => (preset ? isDirty(preset) : false),
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -85,6 +92,13 @@ export function PresetViewer() {
     selectedPath && selectedSlot
       ? ((paths[selectedPath]?.[selectedSlot] as HlxBlock | undefined) ?? null)
       : null;
+
+  function select(dspKey: string, slot: string) {
+    setSelectedPath(dspKey);
+    setSelectedSlot(slot);
+    setParamPage(0);
+    touch();
+  }
 
   function handleLoaded(loaded: LoadedPreset) {
     setPreset(loaded);
@@ -198,15 +212,22 @@ export function PresetViewer() {
       <AddBlockBar
         catalog={catalog}
         models={addable}
+        amps={amps}
+        cabs={cabs}
         paths={Object.keys(paths)}
-        check={(modelId, dspKey, branch) => canAddBlock(preset.data, catalog, modelId, dspKey, branch)}
-        onAdd={(modelId, dspKey, branch) => {
+        checkEffect={(modelId, dspKey, branch) =>
+          canAddBlock(preset.data, catalog, modelId, dspKey, branch)
+        }
+        checkAmp={(modelId, dspKey, branch) =>
+          canAddAmp(preset.data, catalog, modelId, dspKey, branch)
+        }
+        onAddEffect={(modelId, dspKey, branch) => {
           if (!catalog) return;
-          const slot = addBlock(preset.data, catalog, modelId, dspKey, branch);
-          setSelectedPath(dspKey);
-          setSelectedSlot(slot);
-          setParamPage(0);
-          touch();
+          select(dspKey, addBlock(preset.data, catalog, modelId, dspKey, branch));
+        }}
+        onAddAmp={(ampId, cabId, dspKey, branch) => {
+          if (!catalog) return;
+          select(dspKey, addAmpCab(preset.data, catalog, ampId, cabId, dspKey, branch));
         }}
       />
 
@@ -277,6 +298,24 @@ export function PresetViewer() {
           onSwapModel={(modelId) => {
             if (!catalog) return;
             swapModel(preset.data, selectedPath, selectedSlot, modelId, catalog);
+            touch();
+          }}
+          cabs={
+            catalog && selectedBlock["@model"] &&
+            [11, 12].includes(catalog.models[selectedBlock["@model"] as string]?.category ?? -1)
+              ? cabs
+              : undefined
+          }
+          currentCab={
+            typeof selectedBlock["@cab"] === "string"
+              ? ((paths[selectedPath]?.[selectedBlock["@cab"] as string] as HlxBlock | undefined)?.[
+                  "@model"
+                ] as string | undefined) ?? null
+              : null
+          }
+          onSetCab={(cabModelId) => {
+            if (!catalog) return;
+            setAmpCab(preset.data, catalog, selectedPath, selectedSlot, cabModelId);
             touch();
           }}
           onRemove={() => {

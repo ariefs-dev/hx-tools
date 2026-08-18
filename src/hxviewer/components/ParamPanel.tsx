@@ -27,6 +27,9 @@ export function ParamPanel({
   onMove,
   onSwapModel,
   onRemove,
+  cabs,
+  currentCab,
+  onSetCab,
 }: {
   slot: string;
   block: HlxBlock;
@@ -39,6 +42,9 @@ export function ParamPanel({
   onMove: (direction: MoveDirection) => void;
   onSwapModel: (modelId: string) => void;
   onRemove: () => void;
+  cabs?: SwapCandidate[];
+  currentCab?: string | null;
+  onSetCab?: (cabModelId: string | null) => void;
 }) {
   const [iconFailed, setIconFailed] = useState(false);
   const showImage = info.iconUrl && !iconFailed;
@@ -172,6 +178,24 @@ export function ParamPanel({
           <span className="shrink-0 text-neutral-600">
             swapping resets parameters to the model&apos;s defaults
           </span>
+        </label>
+      )}
+
+      {onSetCab && cabs && cabs.length > 0 && (
+        <label className="mb-3 flex items-center gap-2 text-xs text-neutral-500">
+          <span className="shrink-0">Cab</span>
+          <select
+            value={currentCab ?? ""}
+            onChange={(e) => onSetCab(e.target.value || null)}
+            className="min-w-0 flex-1 rounded border border-neutral-700 bg-neutral-800 px-2 py-1 text-xs text-neutral-100"
+          >
+            <option value="">(no cab — Amp only)</option>
+            {cabs.map((c) => (
+              <option key={c.id} value={c.id}>
+                {c.name}
+              </option>
+            ))}
+          </select>
         </label>
       )}
 

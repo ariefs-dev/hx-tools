@@ -50,6 +50,9 @@ main display, which is exactly what Performance view is for.
 - **Reorder** — move a block one slot earlier or later along its path with the arrow buttons.
 - **Swap model** — pick a different model for a block; its parameters reset to that model's
   factory defaults, exactly as HX Edit does. Restricted to models in the same category (see below).
+- **Add and remove blocks** — effects, and **Amp / Amp+Cab**. An amp's panel also gets a Cab
+  picker, so you can change the cab, attach one to a bare Amp, or drop it back to Amp only.
+  The Add button disables itself and names the reason when a documented limit would be exceeded.
 - **Snapshots** — click one to recall it, exactly as the footswitches do on the hardware: its
   stored bypass states and per-snapshot parameter values are applied to the blocks. Each chip
   shows how many of its tracked blocks are on. Parameters that hold a separate value per snapshot
@@ -137,6 +140,7 @@ Where the data comes from, inside `res/`:
 - `lib/hlx/display.ts` — resolves a block into what the UI shows, from the catalog when present and
   the fallbacks otherwise, so components never branch on which mode is active.
 - `lib/hlx/grid.ts` — the row A / row B slot layout and footswitch list behind the hardware view.
+- `lib/hlx/limits.ts` — per-preset / per-path block counts, from the HX Edit Pilot's Guide.
 - `lib/hlx/snapshots.ts` — snapshot selection and keeping the active snapshot's stored copy in sync.
 - `lib/hlx/restructure.ts` — block reordering and model swapping.
 - `scripts/import-res.mjs` — the importer.
@@ -185,13 +189,35 @@ Both operations follow rules derived from the 24 real presets in `../vendor/phel
 Exercised across every block of every sample preset — 316 moves and 449 swaps — with no position
 collisions, no structural-key changes, and every result still re-parsing and round-tripping.
 
+## Adding blocks
+
+Block counts follow the table in the **HX Edit Pilot's Guide** ("DSP Limit and Model
+Availability"), Helix Rack/Floor/LT column — four Amp/Preamp/Cab/IR blocks per preset and two per
+path, one Looper per preset, and so on (`lib/hlx/limits.ts`).
+
+An **Amp+Cab is two linked slots**, and its shape was verified against all 18 Amp+Cab blocks in
+the sample presets before being written:
+
+- the amp sits in a `blockN` slot with `@bypassvolume` and `@cab` naming its cab's slot;
+  `@type` is **3** with a cab and **1** without, and an amp carries **no `@stereo`** at all.
+- the cab sits in its own `cabN` slot holding only `@model`, `@enabled` and its parameters —
+  no `@position`, `@path` or `@type`, because the amp decides where the pair sits.
+- only the amp is registered in the snapshot bypass tables. Cab slots appear there **zero** times
+  across the samples (against 1528 `blockN` references): bypassing an Amp+Cab bypasses the pair.
+
+Parameter keys come from each model's own `symbolicID`, which genuinely differs between models —
+Line 6's data spells the same cab control `EarlyReflections` in 38 models and `Early Reflections`
+in 3.
+
+Verified across every sample preset: adding a block and removing it again restores the file **byte
+for byte** (336 effect cycles, 90 amp cycles, zero failures).
+
 ## Not yet supported
 
-Adding or removing blocks, cross-category model swaps, and footswitch/controller *assignment*
-(existing snapshot-controlled parameters are honoured and edited correctly, but you can't assign
-a new parameter to the Snapshots controller here). Adding blocks needs DSP-budget accounting (the catalog carries
-each model's cost, which the panel already shows); cross-category swaps need the structural-key
-synthesis described above.
+Standalone Cab and IR blocks (an IR carries a `@uuid` into your own IR library, which can't be
+synthesized), cross-category model swaps, and creating a *new* controller assignment — existing
+ones are honoured and edited correctly, but the internal controller numbering isn't documented in
+any source here, so the app won't invent one.
 
 ## Licensing
 
