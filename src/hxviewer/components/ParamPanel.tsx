@@ -7,6 +7,23 @@ import type { HlxBlock } from "@/lib/hlx/model";
 import type { SwapCandidate, MoveDirection } from "@/lib/hlx/restructure";
 import { ParamControl } from "./ParamControl";
 
+/** Values as the device shows them, with nothing to click. */
+function ReadOnlyParams({ params }: { params: BlockDisplay["params"] }) {
+  return (
+    <div className="mb-3 grid gap-x-6 sm:grid-cols-2">
+      {params.map((p) => (
+        <div
+          key={p.id}
+          className="flex items-baseline justify-between gap-2 border-b border-neutral-800 py-1"
+        >
+          <span className="text-sm text-neutral-400">{p.label}</span>
+          <span className="font-mono text-xs text-neutral-100">{p.display}</span>
+        </div>
+      ))}
+    </div>
+  );
+}
+
 function formatRaw(value: unknown): string {
   if (typeof value === "boolean") return value ? "On" : "Off";
   if (typeof value === "number") return Number.isInteger(value) ? String(value) : value.toFixed(3);
@@ -30,6 +47,11 @@ export function ParamPanel({
   cabs,
   currentCab,
   onSetCab,
+  linked,
+  onLinkedParamChange,
+  onLinkedSwapModel,
+  onLinkedToggleEnabled,
+  readOnly = false,
 }: {
   slot: string;
   block: HlxBlock;
@@ -45,15 +67,32 @@ export function ParamPanel({
   cabs?: SwapCandidate[];
   currentCab?: string | null;
   onSetCab?: (cabModelId: string | null) => void;
+  /**
+   * The block named by this one's `@cab`. Both an Amp+Cab and a Dual Cab are
+   * one block on the hardware but two slots in the file, so the linked half's
+   * controls belong in the same panel.
+   */
+  linked?: {
+    slot: string;
+    block: HlxBlock;
+    info: BlockDisplay;
+    candidates: SwapCandidate[];
+  } | null;
+  onLinkedParamChange?: (param: string, value: number | boolean) => void;
+  onLinkedSwapModel?: (modelId: string) => void;
+  onLinkedToggleEnabled?: (enabled: boolean) => void;
+  /** Viewing only: show every value, offer no way to change one. */
+  readOnly?: boolean;
 }) {
   const [iconFailed, setIconFailed] = useState(false);
   const showImage = info.iconUrl && !iconFailed;
   // Input/output/split/join blocks have no bypass state on the hardware.
-  const canBypass = "@enabled" in block;
+  const canBypass = !readOnly && "@enabled" in block;
   const currentModel = typeof block["@model"] === "string" ? block["@model"] : "";
   // Inputs, outputs, split and merge are part of the path itself, not blocks
   // you can take out; they have no @position.
-  const canRemove = typeof block["@position"] === "number" && slot !== "split" && slot !== "join";
+  const canRemove =
+    !readOnly && typeof block["@position"] === "number" && slot !== "split" && slot !== "join";
   const canMove = canMoveEarlier || canMoveLater;
 
   // Group the picker by the catalog's own subcategories (Mono / Stereo /
@@ -199,11 +238,74 @@ export function ParamPanel({
         </label>
       )}
 
-      {info.params.length > 0 && (
-        <div className="mb-3 grid gap-x-6 sm:grid-cols-2">
-          {info.params.map((p) => (
-            <ParamControl key={p.id} param={p} onChange={(v) => onParamChange(p.id, v)} />
-          ))}
+      {info.params.length > 0 &&
+        (readOnly ? (
+          <ReadOnlyParams params={info.params} />
+        ) : (
+          <div className="mb-3 grid gap-x-6 sm:grid-cols-2">
+            {info.params.map((p) => (
+              <ParamControl key={p.id} param={p} onChange={(v) => onParamChange(p.id, v)} />
+            ))}
+          </div>
+        ))}
+
+      {linked && (
+        <div className="mb-3 rounded-md border border-neutral-800 bg-neutral-950/40 p-3">
+          <div className="mb-2 flex items-center justify-between gap-2">
+            <p className="text-xs font-semibold text-neutral-100">
+              <span style={{ color: linked.info.categoryColor ?? "#737373" }}>
+                {linked.info.categoryLabel}
+              </span>{" "}
+              {linked.info.name}
+              <span className="text-neutral-600"> &middot; {linked.slot}</span>
+            </p>
+            {!readOnly && "@enabled" in linked.block && onLinkedToggleEnabled && (
+              <button
+                type="button"
+                onClick={() => onLinkedToggleEnabled(!linked.info.enabled)}
+                className={`rounded px-2 py-0.5 text-[11px] font-semibold transition-colors ${
+                  linked.info.enabled
+                    ? "bg-sky-600 text-white hover:bg-sky-500"
+                    : "bg-neutral-800 text-neutral-400 hover:bg-neutral-700"
+                }`}
+              >
+                {linked.info.enabled ? "ON" : "BYPASSED"}
+              </button>
+            )}
+          </div>
+
+          {!readOnly && linked.candidates.length > 0 && onLinkedSwapModel && (
+            <label className="mb-2 flex items-center gap-2 text-xs text-neutral-500">
+              <span className="shrink-0">Model</span>
+              <select
+                value={(linked.block["@model"] as string) ?? ""}
+                onChange={(e) => onLinkedSwapModel(e.target.value)}
+                className="min-w-0 flex-1 rounded border border-neutral-700 bg-neutral-800 px-2 py-1 text-xs text-neutral-100"
+              >
+                {linked.candidates.map((c) => (
+                  <option key={c.id} value={c.id}>
+                    {c.name}
+                  </option>
+                ))}
+              </select>
+            </label>
+          )}
+
+          {readOnly ? (
+            <ReadOnlyParams params={linked.info.params} />
+          ) : (
+            onLinkedParamChange && (
+              <div className="grid gap-x-6 sm:grid-cols-2">
+                {linked.info.params.map((p) => (
+                  <ParamControl
+                    key={p.id}
+                    param={p}
+                    onChange={(v) => onLinkedParamChange(p.id, v)}
+                  />
+                ))}
+              </div>
+            )
+          )}
         </div>
       )}
 

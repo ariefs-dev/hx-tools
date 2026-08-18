@@ -12,10 +12,12 @@ export function SnapshotList({
   snapshots,
   onSelect,
   onRename,
+  readOnly = false,
 }: {
   snapshots: SnapshotSummary[];
   onSelect: (index: number) => void;
   onRename: (key: string, name: string) => void;
+  readOnly?: boolean;
 }) {
   if (snapshots.length === 0) return null;
   return (
@@ -35,6 +37,7 @@ export function SnapshotList({
                 value={snap.name}
                 onChange={(e) => onRename(snap.key, e.target.value)}
                 aria-label={`Name of ${snap.key}`}
+                readOnly={readOnly}
                 className="w-24 bg-transparent text-center text-xs text-neutral-100 focus:outline-none"
               />
               <span className="text-[10px] text-sky-400">
@@ -46,8 +49,13 @@ export function SnapshotList({
               key={snap.key}
               type="button"
               onClick={() => onSelect(snap.index)}
-              title={`Recall this snapshot — ${snap.blocksOn} of ${snap.blocksTracked} blocks on`}
-              className="flex items-center gap-1 rounded-full border border-neutral-800 bg-neutral-900 px-3 py-1 text-xs text-neutral-300 hover:border-neutral-600"
+              disabled={readOnly}
+              title={
+                readOnly
+                  ? "Switch to Editor to recall a snapshot"
+                  : `Recall this snapshot — ${snap.blocksOn} of ${snap.blocksTracked} blocks on`
+              }
+              className="flex items-center gap-1 rounded-full border border-neutral-800 bg-neutral-900 px-3 py-1 text-xs text-neutral-300 enabled:hover:border-neutral-600 disabled:opacity-60"
             >
               <span className="w-24 truncate">{snap.name}</span>
               <span className="text-[10px] text-neutral-600">
@@ -58,7 +66,9 @@ export function SnapshotList({
         )}
       </div>
       <p className="mt-1.5 text-[11px] text-neutral-600">
-        Click a snapshot to recall it. Edits apply to the active snapshot.
+        {readOnly
+          ? "Read only — switch to Editor to recall or rename snapshots."
+          : "Click a snapshot to recall it. Edits apply to the active snapshot."}
       </p>
     </div>
   );

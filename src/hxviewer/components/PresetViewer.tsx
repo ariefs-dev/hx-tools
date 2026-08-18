@@ -48,7 +48,9 @@ export function PresetViewer() {
   const [selectedSlot, setSelectedSlot] = useState<string | null>(null);
   const [catalog, setCatalog] = useState<Catalog | null>(null);
   const [catalogChecked, setCatalogChecked] = useState(false);
-  const [view, setView] = useState<"editor" | "hardware">("editor");
+  // A preset opens in the hardware view, which is read-only: you see it as the
+  // device shows it, and nothing can be changed until you switch to Editor.
+  const [view, setView] = useState<"editor" | "hardware">("hardware");
   const [paramPage, setParamPage] = useState(0);
 
   // Edits mutate the parsed tree in place (it's large, and edits are
@@ -79,6 +81,7 @@ export function PresetViewer() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
     [preset, revision]
   );
+  const readOnly = view === "hardware";
   const addable = useMemo(() => addableModels(catalog), [catalog]);
   const amps = useMemo(() => ampModels(catalog), [catalog]);
   const cabs = useMemo(() => cabModels(catalog), [catalog]);
@@ -88,10 +91,43 @@ export function PresetViewer() {
     [preset, revision]
   );
 
+  // An Amp+Cab and a Dual Cab are each one block on the hardware but two slots
+  // in the file; the second is named by @cab and has no @position of its own.
+  const linkedSlot =
+    selectedPath && selectedSlot
+      ? ((paths[selectedPath]?.[selectedSlot] as HlxBlock | undefined)?.["@cab"] as
+          | string
+          | undefined)
+      : undefined;
+
   const selectedBlock: HlxBlock | null =
     selectedPath && selectedSlot
       ? ((paths[selectedPath]?.[selectedSlot] as HlxBlock | undefined) ?? null)
       : null;
+
+  const linkedCab =
+    selectedPath && linkedSlot
+      ? (() => {
+          const block = paths[selectedPath]?.[linkedSlot] as HlxBlock | undefined;
+          if (!block) return null;
+          return {
+            slot: linkedSlot,
+            block,
+            info: describe(block, selectedPath, linkedSlot),
+            candidates: readOnly ? [] : swapCandidates(block, catalog),
+          };
+        })()
+      : null;
+
+  function describe(block: HlxBlock, dspKey: string, slot: string) {
+    return describeBlock(
+      block,
+      catalog,
+      new Set(
+        Object.keys(block).filter((key) => isSnapshotControlled(preset!.data, dspKey, slot, key))
+      )
+    );
+  }
 
   function select(dspKey: string, slot: string) {
     setSelectedPath(dspKey);
@@ -135,7 +171,10 @@ export function PresetViewer() {
               touch();
             }}
             aria-label="Preset name"
-            className="w-64 rounded border border-transparent bg-transparent text-lg font-semibold text-neutral-100 hover:border-neutral-700 focus:border-sky-600 focus:outline-none"
+            readOnly={readOnly}
+            className={`w-64 rounded border border-transparent bg-transparent text-lg font-semibold text-neutral-100 focus:outline-none ${
+              readOnly ? "cursor-default" : "hover:border-neutral-700 focus:border-sky-600"
+            }`}
           />
           <p className="text-xs text-neutral-500">
             {preset.filename}
@@ -187,6 +226,23 @@ export function PresetViewer() {
         </div>
       </div>
 
+      {readOnly && (
+        <p className="flex flex-wrap items-center gap-2 rounded-md border border-neutral-800 bg-neutral-900/60 px-3 py-2 text-xs text-neutral-400">
+          <span className="rounded bg-neutral-800 px-1.5 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-neutral-300">
+            Read only
+          </span>
+          Viewing this preset as the device shows it. Switch to{" "}
+          <button
+            type="button"
+            onClick={() => setView("editor")}
+            className="font-semibold text-sky-400 underline underline-offset-2 hover:text-sky-300"
+          >
+            Editor
+          </button>{" "}
+          to make changes.
+        </p>
+      )}
+
       {!preset.roundTrips && (
         <p className="rounded-md border border-amber-700/50 bg-amber-950/30 px-3 py-2 text-xs text-amber-300">
           This file doesn&apos;t re-encode byte-for-byte, so exporting will reformat parts of it that
@@ -199,6 +255,7 @@ export function PresetViewer() {
 
       <SnapshotList
         snapshots={snaps}
+        readOnly={readOnly}
         onSelect={(index) => {
           selectSnapshot(preset.data, index);
           touch();
@@ -209,6 +266,7 @@ export function PresetViewer() {
         }}
       />
 
+      {!readOnly && (
       <AddBlockBar
         catalog={catalog}
         models={addable}
@@ -230,6 +288,7 @@ export function PresetViewer() {
           select(dspKey, addAmpCab(preset.data, catalog, ampId, cabId, dspKey, branch));
         }}
       />
+      )}
 
       {view === "hardware" ? (
         <HardwareView
@@ -271,18 +330,12 @@ export function PresetViewer() {
         <ParamPanel
           slot={selectedSlot}
           block={selectedBlock}
-          info={describeBlock(
-            selectedBlock,
-            catalog,
-            new Set(
-              Object.keys(selectedBlock).filter((key) =>
-                isSnapshotControlled(preset.data, selectedPath, selectedSlot, key)
-              )
-            )
-          )}
-          candidates={swapCandidates(selectedBlock, catalog)}
-          canMoveEarlier={canMoveBlock(paths[selectedPath], selectedSlot, "earlier")}
-          canMoveLater={canMoveBlock(paths[selectedPath], selectedSlot, "later")}
+          info={describe(selectedBlock, selectedPath, selectedSlot)}
+          readOnly={readOnly}
+          candidates={readOnly ? [] : swapCandidates(selectedBlock, catalog)}
+          canMoveEarlier={!readOnly && canMoveBlock(paths[selectedPath], selectedSlot, "earlier")}
+          canMoveLater={!readOnly && canMoveBlock(paths[selectedPath], selectedSlot, "later")}
+          linked={linkedCab}
           onParamChange={(param, value) => {
             setParam(preset.data, selectedPath, selectedSlot, param, value);
             touch();
@@ -301,7 +354,7 @@ export function PresetViewer() {
             touch();
           }}
           cabs={
-            catalog && selectedBlock["@model"] &&
+            !readOnly && catalog && selectedBlock["@model"] &&
             [11, 12].includes(catalog.models[selectedBlock["@model"] as string]?.category ?? -1)
               ? cabs
               : undefined
@@ -318,6 +371,21 @@ export function PresetViewer() {
             setAmpCab(preset.data, catalog, selectedPath, selectedSlot, cabModelId);
             touch();
           }}
+          onLinkedParamChange={(param, value) => {
+            if (!linkedCab) return;
+            setParam(preset.data, selectedPath, linkedCab.slot, param, value);
+            touch();
+          }}
+          onLinkedSwapModel={(modelId) => {
+            if (!catalog || !linkedCab) return;
+            swapModel(preset.data, selectedPath, linkedCab.slot, modelId, catalog);
+            touch();
+          }}
+          onLinkedToggleEnabled={(enabled) => {
+            if (!linkedCab) return;
+            setBlockEnabled(preset.data, selectedPath, linkedCab.slot, enabled);
+            touch();
+          }}
           onRemove={() => {
             removeBlock(preset.data, selectedPath, selectedSlot);
             setSelectedSlot(null);
@@ -326,6 +394,7 @@ export function PresetViewer() {
           }}
         />
       )}
+
     </div>
   );
 }

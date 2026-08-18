@@ -32,6 +32,18 @@ def dumps(obj: Any) -> str:
     return _encode(obj, 0)
 
 
+def _encode_string(value: str) -> str:
+    r"""A JSON string as Helix writes it.
+
+    Helix escapes forward slashes (``"1\/4 DLY"``). JSON permits ``\/`` but
+    doesn't require it, and ``json.dumps`` never emits it — so a preset holding
+    a slash (a note division in a footswitch label, most often) would come back
+    differing from the original. Every slash inside a string is escaped in the
+    presets checked: 2 escaped, 0 bare.
+    """
+    return json.dumps(value).replace("/", r"\/")
+
+
 def _encode(obj: Any, indent: int) -> str:
     if isinstance(obj, dict):
         return _encode_dict(obj, indent)
@@ -47,7 +59,7 @@ def _encode(obj: Any, indent: int) -> str:
     if obj is None:
         return "null"
     if isinstance(obj, str):
-        return json.dumps(obj)
+        return _encode_string(obj)
     raise TypeError(f"Unsupported type in .hlx data: {type(obj)!r}")
 
 

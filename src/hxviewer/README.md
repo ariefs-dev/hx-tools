@@ -7,7 +7,10 @@ browser.
 
 ## Two views
 
-**Editor** — the working view: chain, parameter panel with sliders, model picker.
+A preset **opens in the hardware view, read-only**: you see it exactly as the device shows it and
+nothing can be changed by accident. Switch to **Editor** when you want to make changes.
+
+**Editor** — the working view: chain, parameter panel with sliders, model picker, add/remove.
 
 **Hardware** — the device panel, drawn from the **Helix LT** Owner's Manual and LT Cheat Sheet:
 
@@ -48,6 +51,9 @@ main display, which is exactly what Performance view is for.
   choices; booleans become toggles. Values are clamped to each parameter's catalog range.
 - **Bypass** — toggle any block on/off; the chain view dims it, matching the hardware.
 - **Reorder** — move a block one slot earlier or later along its path with the arrow buttons.
+- **Linked halves** — an Amp+Cab and a Dual Cab are one block on the hardware but two slots in
+  the file, so the panel shows both halves together: each with its own model picker, parameters
+  and bypass.
 - **Swap model** — pick a different model for a block; its parameters reset to that model's
   factory defaults, exactly as HX Edit does. Restricted to models in the same category (see below).
 - **Add and remove blocks** — effects, and **Amp / Amp+Cab**. An amp's panel also gets a Cab
@@ -69,7 +75,8 @@ colon, and floats printed with C's `%.17g` instead of JavaScript's shortest roun
 Exporting naively would silently rewrite every number in the file.
 
 `lib/hlx/codec.ts` reproduces Helix's exact byte layout — including `%.17g`'s half-to-even
-rounding in the 17th digit — and `lib/hlx/parse.ts` preserves key order, which plain `JSON.parse`
+rounding in the 17th digit and Helix's escaping of forward slashes (`"1\/4 DLY"`, which JSON
+permits but neither `JSON.stringify` nor `json.dumps` emits) — and `lib/hlx/parse.ts` preserves key order, which plain `JSON.parse`
 loses because JavaScript hoists integer-like keys (as found in a preset's IR table). Together they
 give a real guarantee, verified against every sample preset on hand:
 

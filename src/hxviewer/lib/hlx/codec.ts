@@ -19,6 +19,19 @@
 
 export type Json = null | boolean | number | string | Json[] | { [key: string]: Json };
 
+/**
+ * A JSON string as Helix writes it.
+ *
+ * Helix escapes forward slashes (`"1\/4 DLY"`). JSON permits `\/` but does
+ * not require it, and neither `JSON.stringify` nor Python's `json.dumps`
+ * emits it — so a preset containing a slash (a note division in a footswitch
+ * label, most often) would come back differing from the original. Every
+ * slash inside a string is escaped in the presets checked: 2 escaped, 0 bare.
+ */
+function encodeString(value: string): string {
+  return JSON.stringify(value).replace(/\//g, String.raw`\/`);
+}
+
 const PRECISION = 17;
 
 /**
@@ -126,7 +139,7 @@ function encodeValue(value: Json, indent: number, order?: WeakMap<object, string
   if (value === null) return "null";
   if (typeof value === "boolean") return value ? "true" : "false";
   if (typeof value === "number") return formatFloat(value);
-  if (typeof value === "string") return JSON.stringify(value);
+  if (typeof value === "string") return encodeString(value);
   if (Array.isArray(value)) return encodeArray(value, indent, order);
   return encodeObject(value, indent, order);
 }
@@ -153,7 +166,7 @@ function encodeObject(
   const pad = "  ".repeat(indent);
   const padIn = "  ".repeat(indent + 1);
   const items = keys.map(
-    (k) => `${padIn}${JSON.stringify(k)} : ${encodeValue(value[k], indent + 1, order)}`
+    (k) => `${padIn}${encodeString(k)} : ${encodeValue(value[k], indent + 1, order)}`
   );
   return `{\n${items.join(",\n")}\n${pad}}`;
 }
